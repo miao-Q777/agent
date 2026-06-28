@@ -159,14 +159,12 @@ def get_python_path(dirpath: str) -> str:
             pyproject_data = tomli.load(f)
             requires_python = pyproject_data.get("project", {}).get("requires-python")
             if requires_python:
-                version_spec = sv.SimpleSpec(requires_python)
-                if version_spec.match(sv.Version("3.14.0")):
-                    # try to resolve python3.14 path
-                    python_path = shutil.which("python3.14")
-                    if python_path:
-                        return python_path
-                    # Temporary hardcoding until python 3.14 until we move to build server
-                    return "/usr/bin/python3.14"
+                  version_spec = sv.SimpleSpec(requires_python)
+                  for minor in range(15, 7, -1):
+                      version = f"3.{minor}"
+                      python_path = shutil.which(f"python{version}")
+                      if python_path and version_spec.match(sv.Version(version)):
+                          return python_path
 
     return _get_server_python_path()
 
