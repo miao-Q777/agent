@@ -76,7 +76,7 @@ def ping_server(password: str):
 @click.option("--proxy-ip", required=False, type=str, default=None)
 @click.option("--sentry-dsn", required=False, type=str)
 @click.option("--press-url", required=False, type=str)
-def config(name, user, workers, job_timeout, proxy_ip=None, sentry_dsn=None, press_url=None, db_port=3306):
+def config(name, user, workers, job_timeout=None, proxy_ip=None, sentry_dsn=None, press_url=None, db_port=3306, domain=None):
     config = {
         "benches_directory": f"/home/{user}/benches",
         "name": name,
@@ -95,6 +95,9 @@ def config(name, user, workers, job_timeout, proxy_ip=None, sentry_dsn=None, pre
         config["press_url"] = press_url
     if proxy_ip:
         config["proxy_ip"] = proxy_ip
+    if not domain:
+        domain = ".".join(name.split(".")[1:])
+    config["domain"] = domain
     if sentry_dsn:
         config["sentry_dsn"] = sentry_dsn
 
