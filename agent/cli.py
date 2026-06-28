@@ -77,6 +77,10 @@ def ping_server(password: str):
 @click.option("--sentry-dsn", required=False, type=str)
 @click.option("--press-url", required=False, type=str)
 def config(name, user, workers, job_timeout=None, proxy_ip=None, sentry_dsn=None, press_url=None, db_port=3306, domain=None):
+    existing = {}
+    if os.path.exists("config.json"):
+          with open("config.json", "r") as f:
+              existing = json.load(f)
     config = {
         "benches_directory": f"/home/{user}/benches",
         "name": name,
@@ -100,7 +104,7 @@ def config(name, user, workers, job_timeout=None, proxy_ip=None, sentry_dsn=None
     config["domain"] = domain
     if sentry_dsn:
         config["sentry_dsn"] = sentry_dsn
-
+    config = {**existing, **config}
     with open("config.json", "w") as f:
         json.dump(config, f, sort_keys=True, indent=4)
 
