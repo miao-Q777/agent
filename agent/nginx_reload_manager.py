@@ -87,7 +87,7 @@ class NginxReloadManager:
             self.state = ManagerState.WAIT
 
         elif self.state == ManagerState.RELOAD_PENDING:
-            if self._should_skip_nginx_reload():
+            if self._should_skip_nginx_reload() and not self.job_ids:
                 self.state = ManagerState.WAIT
                 return
 
