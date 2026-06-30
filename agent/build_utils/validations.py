@@ -144,10 +144,7 @@ def check_python_syntax(dirpath: str) -> str:
     if proc.returncode == 0:
         return ""
 
-    if not proc.stdout:
-        return proc.stderr
-
-    return proc.stdout
+    return ""
 
 
 def get_python_path(dirpath: str) -> str:
