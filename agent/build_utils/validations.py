@@ -144,8 +144,13 @@ def check_python_syntax(dirpath: str) -> str:
     if proc.returncode == 0:
         return ""
 
-    return ""
-
+    # 只吞 SyntaxError（宿主 Python 与代码要求版本不匹配导致的误报）
+    # Docker Build 内部用正确的 Python 版本做真正的编译验证
+    errors = (proc.stdout or proc.stderr).strip()
+    if "SyntaxError" in errors:
+        return ""
+	
+    return errors
 
 def get_python_path(dirpath: str) -> str:
     """Check for python version in the pyproject.toml file if present else return bench python path"""
