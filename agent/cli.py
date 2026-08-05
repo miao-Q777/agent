@@ -91,7 +91,7 @@ def config(name, user, workers, job_timeout=None, proxy_ip=None, sentry_dsn=None
         "workers": workers,
         "gunicorn_workers": 2,
         "web_port": 25052,
-        "press_url": "https://frappecloud.com",
+        "press_url": "https://os.getgrowth.app",
         "db_port": db_port,
         "job_timeout": job_timeout,
     }

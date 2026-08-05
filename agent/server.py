@@ -56,7 +56,7 @@ class Server(Base):
 
     @property
     def press_url(self):
-        return self.config.get("press_url", "https://frappecloud.com")
+        return self.config.get("press_url", "https://os.getgrowth.app")
 
     def docker_login(self, registry):
         url = shlex.quote(registry["url"])
