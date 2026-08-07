@@ -619,7 +619,9 @@ class ImageBuilder(Base, JobMixin):
         return {"output": self.output["build"]}
 
     def _get_build_command(self) -> str:
-        command = f"docker buildx build --platform {self.platform}"
+        # 两 VPS 架构：build 与 m1 MariaDB 同机（Hostinger 16G），必须限制 build 内存，
+        # 否则 pip/npm 编译峰值可能触发系统 OOM 杀 MariaDB。6g/2cpus 起步，实测后调整。
+        command = f"docker buildx build --platform {self.platform} --memory=6g --cpus=2"
 
         if self.build_token:
             with tempfile.NamedTemporaryFile(
