@@ -619,9 +619,9 @@ class ImageBuilder(Base, JobMixin):
         return {"output": self.output["build"]}
 
     def _get_build_command(self) -> str:
-        # 两 VPS 架构：build 与 m1 MariaDB 同机（Hostinger 16G），必须限制 build 内存，
-        # 否则 pip/npm 编译峰值可能触发系统 OOM 杀 MariaDB。6g/2cpus 起步，实测后调整。
-        command = f"docker buildx build --platform {self.platform} --memory=6g --cpus=2"
+        # ⚠️ 不要加 --memory/--cpus：docker buildx build 不支持这两个 flag（unknown flag 直接失败）。
+        #    build 内存靠错峰 + Hostinger buffer_pool 下调（m1 4G→2G）控制，实测峰值后定终值。
+        command = f"docker buildx build --platform {self.platform}"
 
         if self.build_token:
             with tempfile.NamedTemporaryFile(
