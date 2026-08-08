@@ -700,6 +700,14 @@ class Bench(Base):
         self.docker_execute("supervisorctl update")
 
     def generate_supervisor_config(self):
+        # assets_wsgi wrapper: 自建实例无 nginx 层（CF Tunnel 直连 gunicorn），/assets 由
+        # SharedDataMiddleware 服务。frappe.app:application 无 statics 包装（application_with_statics
+        # 只在 dev 服务器路径调用），gunicorn 需指向 wrapper 才挂上中间件。
+        wrapper_path = os.path.join(self.directory, "sites", "assets_wsgi.py")
+        if not os.path.exists(wrapper_path):
+            with open(wrapper_path, "w") as f:
+                f.write("import frappe.app\napplication = frappe.app.application_with_statics()\n")
+
         supervisor_config = os.path.join(self.directory, "config", "supervisor.conf")
         self.server._render_template(
             "bench/supervisor.conf",
