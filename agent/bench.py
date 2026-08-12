@@ -703,10 +703,31 @@ class Bench(Base):
         # assets_wsgi wrapper: 自建实例无 nginx 层（CF Tunnel 直连 gunicorn），/assets 由
         # SharedDataMiddleware 服务。frappe.app:application 无 statics 包装（application_with_statics
         # 只在 dev 服务器路径调用），gunicorn 需指向 wrapper 才挂上中间件。
+        # 坑 55（2026-08-12）：werkzeug 给 .gz 文件加 Content-Encoding: gzip → CF 边缘
+        # 误判为传输编码并解压 → 下载截断（1.1MB 备份只剩 102 字节 metadata 头）。
+        # wrapper 剥离 /backups、/private 响应的 Content-Encoding。已实测验证。
+        wrapper_content = '''import frappe.app
+
+class StripEncodingMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        path = environ.get("PATH_INFO", "")
+        if path.startswith(("/backups", "/private")):
+            def fix_headers(status, headers, exc_info=None):
+                headers = [(k, v) for k, v in headers if k.lower() != "content-encoding"]
+                return start_response(status, headers, exc_info)
+            return self.app(environ, fix_headers)
+        return self.app(environ, start_response)
+
+application = StripEncodingMiddleware(frappe.app.application_with_statics())
+'''
         wrapper_path = os.path.join(self.directory, "sites", "assets_wsgi.py")
-        if not os.path.exists(wrapper_path):
+        if not os.path.exists(wrapper_path) or "StripEncodingMiddleware" not in open(wrapper_path).read():
+            # 不存在则创建；存在但缺中间件（旧 wrapper）则升级，保证重建/重配后修复不丢
             with open(wrapper_path, "w") as f:
-                f.write("import frappe.app\napplication = frappe.app.application_with_statics()\n")
+                f.write(wrapper_content)
 
         supervisor_config = os.path.join(self.directory, "config", "supervisor.conf")
         self.server._render_template(
