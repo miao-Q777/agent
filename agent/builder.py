@@ -361,7 +361,13 @@ class ValidationManager(Base, JobMixin):
             actual += ".0"
 
         sv_actual = sv.Version(actual)
-        sv_expected = sv.SimpleSpec(expected)
+        try:
+            sv_expected = sv.SimpleSpec(expected)
+        except ValueError:
+            # Npm-style ranges in package.json engines (e.g. "^20.19.0 || >=22.12.0")
+            # are not SimpleSpec-parseable; NpmSpec handles them.
+            # Ports upstream frappe/agent e0e3d3e (2026-08-18).
+            sv_expected = sv.NpmSpec(expected)
 
         return sv_actual in sv_expected
 
