@@ -58,6 +58,10 @@ class Server(Base):
     def press_url(self):
         return self.config.get("press_url", "https://os.getgrowth.app")
 
+    @property
+    def backup_workers(self) -> int:
+        return self.config.get("backup_workers", 1)
+
     def docker_login(self, registry):
         url = shlex.quote(registry["url"])
         username = shlex.quote(registry["username"])
@@ -222,6 +226,17 @@ class Server(Base):
 
             self.disable_production_on_bench(bench_name)
             self._move_bench_to_archived_directory(bench_name)
+
+    @job("Fetch Backup Jobs")
+    def fetch_backup_jobs(self, site: str, start: str, end: str):
+        return self._fetch_backup_jobs(site, start, end)
+
+    @step("Fetch Backup Jobs")
+    def _fetch_backup_jobs(self, site: str, start: str, end: str):
+        """Walking the job database can take seconds, so it runs here and not in a worker."""
+        from agent.backup_log import get_backup_jobs
+
+        return get_backup_jobs(site, start, end)
 
     @job("Push Images to Registry")
     def push_images_to_registry(self, images: list[str], registry_settings: dict[str, str]) -> None:
@@ -888,13 +903,19 @@ class Server(Base):
 
         self._generate_redis_config()
         self._generate_supervisor_config()
-        self.execute("sudo supervisorctl reread")
+        # reread alone loads the new config without acting on it; update is what
+        # actually adds and starts programs that are new in the template.
+        self._update_supervisor()
         self.execute("sudo supervisorctl restart agent:redis")
 
         self.setup_nginx()
         for worker in range(self.config["workers"]):
             worker_name = f"agent:worker-{worker}"
             self.execute(f"sudo supervisorctl restart {worker_name}")
+
+        for worker in range(self.backup_workers):
+            worker_name = f"agent:worker_backup-{worker}"
+            self.execute(f"sudo supervisorctl restart {worker_name}", non_zero_throw=False)
 
         self.execute("sudo supervisorctl restart agent:web")
         run_patches()
@@ -923,11 +944,12 @@ class Server(Base):
 
         # Stop required services
         if restart_rq_workers:
-            for worker_id in supervisor_status.get("worker", {}):
-                self.execute(
-                    f"sudo supervisorctl stop agent:worker-{worker_id}",
-                    non_zero_throw=False,
-                )
+            for group in ("worker", "worker_backup"):
+                for worker_id in supervisor_status.get(group, {}):
+                    self.execute(
+                        f"sudo supervisorctl stop agent:{group}-{worker_id}",
+                        non_zero_throw=False,
+                    )
 
         # Stop NGINX Reload Manager if it's a proxy server
         is_proxy_server = (
@@ -965,6 +987,8 @@ class Server(Base):
         if restart_rq_workers:
             for i in range(self.config["workers"]):
                 self.execute(f"sudo supervisorctl start agent:worker-{i}")
+            for i in range(self.backup_workers):
+                self.execute(f"sudo supervisorctl start agent:worker_backup-{i}", non_zero_throw=False)
 
         if restart_web_workers:
             self.execute("sudo supervisorctl start agent:web")
@@ -1224,6 +1248,7 @@ class Server(Base):
             "redis_port": self.config["redis_port"],
             "gunicorn_workers": self.config.get("gunicorn_workers", 2),
             "workers": self.config["workers"],
+            "backup_workers": self.backup_workers,
             "directory": self.directory,
             "user": self.config["user"],
             "sentry_dsn": self.config.get("sentry_dsn"),
